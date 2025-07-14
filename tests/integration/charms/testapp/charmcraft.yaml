@@ -1,0 +1,18 @@
+name: testapp
+type: charm
+summary: Test app ("db" consumer) charm for Jubilant integration tests
+description: Test app ("db" consumer) charm for Jubilant integration tests
+
+requires:
+  db:
+    interface: dbi
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  app-charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]

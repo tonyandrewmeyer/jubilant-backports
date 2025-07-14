@@ -1,0 +1,32 @@
+name: testdb
+type: charm
+summary: Test "db" provider charm for Jubilant integration tests
+description: Test "db" provider charm for Jubilant integration tests
+
+provides:
+  db:
+    interface: dbi
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  db-charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
+
+actions:
+  do-thing:
+    description: Do a thing.
+    params:
+      mode:
+        type: string
+
+config:
+  options:
+    testoption:
+      type: string
+      description: A test option.
+      default: ""
