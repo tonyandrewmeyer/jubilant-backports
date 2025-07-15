@@ -22,6 +22,7 @@ from jubilant import (
 
 from . import statustypes
 from ._juju import Juju29 as Juju
+from ._task import ExecTask29 as ExecTask  # Note that this is not present in Jubilant.
 from ._task import Task29 as Task
 from ._task import TaskError29 as TaskError
 from ._test_helpers import temp_model
@@ -30,6 +31,7 @@ from .statustypes import Status
 __all__ = [
     'CLIError',
     'ConfigValue',
+    'ExecTask',
     'Juju',
     'SecretURI',
     'Status',

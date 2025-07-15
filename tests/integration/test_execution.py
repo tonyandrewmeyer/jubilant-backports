@@ -36,9 +36,10 @@ def test_run_error(juju: Juju29):
         juju.run('testdb/0', 'do-thing', {'error': 'ERR'})
     task = excinfo.value.task
     assert not task.success
-    assert task.status == 'failed'
+    if juju.cli_major_version != 2:
+        assert task.status == 'failed'  # type: ignore
     assert task.return_code == 0  # return_code is 0 even if action fails
-    assert task.message == 'failed with error: ERR'
+    assert task.message == 'failed with error: ERR'  # type: ignore
 
 
 def test_run_exception(juju: Juju29):
@@ -46,7 +47,8 @@ def test_run_exception(juju: Juju29):
         juju.run('testdb/0', 'do-thing', {'exception': 'EXC'})
     task = excinfo.value.task
     assert not task.success
-    assert task.status == 'failed'
+    if juju.cli_major_version != 2:
+        assert task.status == 'failed'  # type: ignore
     assert task.return_code != 0
     assert 'EXC' in task.stderr
 

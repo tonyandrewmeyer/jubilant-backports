@@ -13,6 +13,7 @@ import jubilant
 from jubilant import _yaml
 from jubilant._juju import _format_config
 
+from ._task import ExecTask29 as ExecTask
 from ._task import Task29 as Task
 from .statustypes import Status
 
@@ -212,10 +213,12 @@ class Juju29(jubilant.Juju):
         self.cli(*args)
 
     @overload
-    def exec(self, command: str, *args: str, machine: int, wait: float | None = None) -> Task: ...
+    def exec(
+        self, command: str, *args: str, machine: int, wait: float | None = None
+    ) -> ExecTask: ...
 
     @overload
-    def exec(self, command: str, *args: str, unit: str, wait: float | None = None) -> Task: ...
+    def exec(self, command: str, *args: str, unit: str, wait: float | None = None) -> ExecTask: ...
 
     def exec(  # type: ignore
         self,
@@ -224,7 +227,7 @@ class Juju29(jubilant.Juju):
         machine: int | None = None,
         unit: str | None = None,
         wait: float | None = None,
-    ) -> Task:
+    ) -> ExecTask:
         """Run the command on the remote target specified.
 
         You must specify either *machine* or *unit*, but not both.
@@ -283,8 +286,6 @@ class Juju29(jubilant.Juju):
 
         # Command doesn't return any stdout if no units exist.
         results: list[dict[str, Any]] = json.loads(stdout) if stdout.strip() else []
-        # In Juju 2.9, we get 'machine' or 'unit', 'return-code', 'stdout', and 'stderr' keys.
-        # 'stdout' or 'stderr' are missing if nothing was written to them.
         if machine is not None:
             for result in results:
                 if 'machine' in result and result['machine'] == str(machine):
@@ -297,7 +298,7 @@ class Juju29(jubilant.Juju):
                     break
             else:
                 raise ValueError(f'unit {unit!r} not found, stderr:\n{stderr}')
-        task = Task._from_dict(result)
+        task = ExecTask._from_dict(result)
         task.raise_on_failure()
         return task
 
@@ -406,7 +407,7 @@ class Juju29(jubilant.Juju):
         if trust:
             self.trust(app)
 
-    def run(
+    def run(  # type: ignore
         self,
         unit: str,
         action: str,
@@ -445,9 +446,9 @@ class Juju29(jubilant.Juju):
         if self.cli_major_version >= 3:
             return super().run(unit, action, params, wait=wait)
 
-        args = ['run-action', '--format', 'json', unit, action]
+        args = ['run-action', '--format', 'json', unit, action, '--wait']
         if wait is not None:
-            args.extend(['--wait', f'{wait}s'])
+            args.extend([f'{wait}s'])
 
         params_file = None
         if params is not None:
@@ -472,11 +473,12 @@ class Juju29(jubilant.Juju):
 
             # Command doesn't return any stdout if no units exist.
             all_tasks: dict[str, Any] = json.loads(stdout) if stdout.strip() else {}
-            if unit not in all_tasks:
+            full_unit_name = f'unit-{unit.replace("/", "-")}'
+            if full_unit_name not in all_tasks:
                 raise ValueError(
                     f'action {action!r} not defined or unit {unit!r} not found, stderr:\n{stderr}'
                 )
-            task = Task._from_dict(all_tasks[unit])
+            task = Task._from_dict(all_tasks[full_unit_name])
             task.raise_on_failure()
             return task
         finally:
