@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import jubilant_backports as jubilant
+from jubilant_backports._juju import Juju29
 
 from . import helpers
 
 
-def test_integrate_and_remove_relation(juju: jubilant.Juju):
+def test_integrate_and_remove_relation(juju: Juju29):
     juju.deploy(helpers.find_charm('testdb'))
     juju.deploy(helpers.find_charm('testapp'))
 

@@ -4,15 +4,16 @@ import pytest
 import requests
 
 import jubilant_backports as jubilant
+from jubilant_backports._juju import Juju29
 
 
 @pytest.fixture(scope='module', autouse=True)
-def setup(juju: jubilant.Juju):
+def setup(juju: Juju29):
     juju.deploy('snappass-test')
     juju.wait(jubilant.all_active)
 
 
-def test_deploy(juju: jubilant.Juju):
+def test_deploy(juju: Juju29):
     # Setup has already done "juju deploy", this tests it.
     status = juju.status()
     address = status.apps['snappass-test'].units['snappass-test/0'].address
@@ -29,7 +30,7 @@ def test_deploy(juju: jubilant.Juju):
     assert jubilant.all_agents_idle(status, 'snappass-test')
 
 
-def test_add_and_remove_unit(juju: jubilant.Juju):
+def test_add_and_remove_unit(juju: Juju29):
     juju.add_unit('snappass-test')
     juju.wait(
         lambda status: jubilant.all_active(status) and len(status.apps['snappass-test'].units) == 2
@@ -41,12 +42,12 @@ def test_add_and_remove_unit(juju: jubilant.Juju):
     )
 
 
-def test_remove_application(juju: jubilant.Juju):
+def test_remove_application(juju: Juju29):
     juju.remove_application('snappass-test')
     juju.wait(lambda status: not status.apps)
 
 
-def test_deploy_with_resources(juju: jubilant.Juju):
+def test_deploy_with_resources(juju: Juju29):
     juju.deploy(
         'snappass-test',
         'snappass-with-resources',

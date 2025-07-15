@@ -21,10 +21,10 @@ from jubilant import (
     any_maintenance,
     any_waiting,
     statustypes,
-    temp_model,
 )
 
-from ._juju import Juju
+from ._juju import Juju29 as Juju
+from ._test_helpers import temp_model
 from .statustypes import Status
 
 __all__ = [

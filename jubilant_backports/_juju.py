@@ -17,7 +17,7 @@ from jubilant._task import Task
 from .statustypes import Status
 
 
-class Juju(jubilant.Juju):
+class Juju29(jubilant.Juju):
     """Instantiate this class to run Juju commands.
 
     Most methods directly call a single Juju CLI command. If a CLI command doesn't yet exist as a
