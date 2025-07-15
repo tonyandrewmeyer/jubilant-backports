@@ -7,8 +7,8 @@ from . import helpers
 
 
 def test_integrate_and_remove_relation(juju: Juju29):
-    juju.deploy(helpers.find_charm('testdb'), base='ubuntu@22.04')
-    juju.deploy(helpers.find_charm('testapp'), base='ubuntu@22.04')
+    juju.deploy(helpers.find_charm('testdb'), base='ubuntu@24.04')
+    juju.deploy(helpers.find_charm('testapp'), base='ubuntu@24.04')
 
     juju.integrate('testdb', 'testapp')
     status = juju.wait(jubilant.all_active)

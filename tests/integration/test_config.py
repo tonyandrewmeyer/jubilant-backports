@@ -11,7 +11,7 @@ from . import helpers
 
 @pytest.fixture(scope='module', autouse=True)
 def setup(juju: Juju29):
-    juju.deploy(helpers.find_charm('testdb'), base='ubuntu@22.04')
+    juju.deploy(helpers.find_charm('testdb'), base='ubuntu@24.04')
     juju.wait(
         lambda status: status.apps['testdb'].units['testdb/0'].workload_status.current == 'unknown'
     )
