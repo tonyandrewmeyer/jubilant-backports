@@ -1,4 +1,4 @@
-jubilant.statustypes
-====================
+jubilant_backports.statustypes
+==============================
 
-.. automodule:: jubilant.statustypes
+.. automodule:: jubilant_backports.statustypes
