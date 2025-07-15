@@ -477,11 +477,15 @@ class Juju29(jubilant.Juju):
             if params_file is not None:
                 os.remove(params_file.name)
 
-    def status(self) -> Status:
+    def status(self) -> Status | jubilant.Status:  # type: ignore
         """Fetch the status of the current model, including its applications and units."""
         stdout = self.cli('status', '--format', 'json')
         result = json.loads(stdout)
-        return Status._from_dict(result)
+        # The status we get back depends on the Juju controller version, not the
+        # CLI version.
+        if result['model']['version'].startswith('2'):
+            return Status._from_dict(result)
+        return jubilant.Status._from_dict(result)
 
 
 def _base_to_series(base: str) -> str:

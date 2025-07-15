@@ -20,9 +20,9 @@ from jubilant import (
     any_error,
     any_maintenance,
     any_waiting,
-    statustypes,
 )
 
+from . import statustypes
 from ._juju import Juju29 as Juju
 from ._test_helpers import temp_model
 from .statustypes import Status
