@@ -285,7 +285,7 @@ class Juju29(jubilant.Juju):
         results: dict[str, Any] = json.loads(stdout) if stdout.strip() else {}
         if machine is not None:
             if str(machine) not in results:
-                raise ValueError(f'machine {machine!r} not found, stderr:\n{stderr}')
+                raise ValueError(f'machine {machine!r} not found, stderr:\n{stderr} {results!r}')
             result = results[str(machine)]
         else:
             if unit not in results:

@@ -134,3 +134,6 @@ reportPrivateUsage = false  # silence errors about use of _from_dict outside cla
 pythonpath = [
   "."
 ]
+markers = [
+    "machine",
+]
