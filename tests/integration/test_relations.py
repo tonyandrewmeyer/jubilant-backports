@@ -15,8 +15,8 @@ def test_integrate_and_remove_relation(juju: Juju29):
     juju.integrate('testdb', 'testapp')
     status = juju.wait(jubilant.all_active)
     if juju.cli_major_version == 2:
-        assert status.apps['testdb'].relations['db'][0] == 'testapp/0'
-        assert status.apps['testapp'].relations['db'][0] == 'testdb/0'
+        assert status.apps['testdb'].relations['db'][0] == 'testapp'
+        assert status.apps['testapp'].relations['db'][0] == 'testdb'
     else:
         assert isinstance(status, real_jubilant.Status)
         assert status.apps['testdb'].relations['db'][0].related_app == 'testapp'

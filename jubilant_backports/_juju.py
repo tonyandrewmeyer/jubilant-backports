@@ -475,7 +475,7 @@ class Juju29(jubilant.Juju):
             try:
                 stdout, stderr = self._cli(*args)
             except jubilant.CLIError as exc:
-                if 'timed out' in exc.stderr:
+                if 'timed out' in exc.stderr or 'timeout reached' in exc.stderr:
                     msg = f'timed out waiting for action, stderr:\n{exc.stderr}'
                     raise TimeoutError(msg) from None
                 # The "juju run" CLI command fails if the action has an uncaught exception.
