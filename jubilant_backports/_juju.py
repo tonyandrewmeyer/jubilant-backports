@@ -282,15 +282,19 @@ class Juju29(jubilant.Juju):
             stderr = exc.stderr
 
         # Command doesn't return any stdout if no units exist.
-        results: dict[str, Any] = json.loads(stdout) if stdout.strip() else {}
+        results: list[dict[str, Any]] = json.loads(stdout) if stdout.strip() else []
         if machine is not None:
-            if str(machine) not in results:
-                raise ValueError(f'machine {machine!r} not found, stderr:\n{stderr} {results!r}')
-            result = results[str(machine)]
+            for result in results:
+                if 'machine' in result and result['machine'] == str(machine):
+                    break
+            else:
+                raise ValueError(f'machine {machine!r} not found, stderr:\n{stderr}')
         else:
-            if unit not in results:
+            for result in results:
+                if 'unit' in result and result['unit'] == unit:
+                    break
+            else:
                 raise ValueError(f'unit {unit!r} not found, stderr:\n{stderr}')
-            result = results[unit]
         task = Task._from_dict(result)
         task.raise_on_failure()
         return task
