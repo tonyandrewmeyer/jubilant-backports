@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        juju-version: ["2", "3"]
+        juju-version: ["2.9", "3"]
 
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.juju-version}}-machine
