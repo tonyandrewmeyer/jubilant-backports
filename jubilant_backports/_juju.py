@@ -558,11 +558,11 @@ class Juju29(jubilant.Juju):
         """
         if self.cli_major_version >= 3:
             return super().wait(
-                ready,
-                error=error,
+                ready,  # type: ignore
+                error=error,  # type: ignore
                 delay=delay,
                 timeout=timeout,
-                successes=successes,  # type: ignore
+                successes=successes,
             )
         if timeout is None:
             timeout = self.wait_timeout
