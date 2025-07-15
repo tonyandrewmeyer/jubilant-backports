@@ -556,6 +556,14 @@ class Juju29(jubilant.Juju):
             WaitError: If the *error* callable returns True. A string representation
                 of the last status is added as an exception note.
         """
+        if self.cli_major_version >= 3:
+            return super().wait(
+                ready,
+                error=error,
+                delay=delay,
+                timeout=timeout,
+                successes=successes,  # type: ignore
+            )
         if timeout is None:
             timeout = self.wait_timeout
 
