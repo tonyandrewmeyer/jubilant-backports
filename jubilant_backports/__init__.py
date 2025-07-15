@@ -7,6 +7,10 @@ from jubilant import (
     ConfigValue,
     SecretURI,
     WaitError,
+)
+
+from . import statustypes
+from ._all_any import (
     all_active,
     all_agents_idle,
     all_blocked,
@@ -19,8 +23,6 @@ from jubilant import (
     any_maintenance,
     any_waiting,
 )
-
-from . import statustypes
 from ._juju import Juju29 as Juju
 from ._task import ExecTask29 as ExecTask  # Note that this is not present in Jubilant.
 from ._task import Task29 as Task

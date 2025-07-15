@@ -3,19 +3,23 @@ from __future__ import annotations
 import contextlib
 import functools
 import json
+import logging
 import os
 import pathlib
 import tempfile
+import time
 from collections.abc import Iterable, Mapping
-from typing import Any, overload
+from typing import Any, Callable, overload
 
 import jubilant
-from jubilant import _yaml
+from jubilant import _pretty, _yaml
 from jubilant._juju import _format_config
 
 from ._task import ExecTask29 as ExecTask
 from ._task import Task29 as Task
 from .statustypes import Status
+
+logger_wait = logging.getLogger('jubilant.wait')
 
 
 class Juju29(jubilant.Juju):
@@ -503,6 +507,114 @@ class Juju29(jubilant.Juju):
         if result['model']['version'].startswith('2'):
             return Status._from_dict(result)
         return jubilant.Status._from_dict(result)
+
+    def wait(  # type: ignore
+        self,
+        ready: Callable[[Status], bool],
+        *,
+        error: Callable[[Status], bool] | None = None,
+        delay: float = 1.0,
+        timeout: float | None = None,
+        successes: int = 3,
+    ) -> Status | jubilant.Status:
+        """Wait until ``ready(status)`` returns true.
+
+        This fetches the Juju status repeatedly (waiting *delay* seconds between each call),
+        and returns the last status after the *ready* callable returns true for *successes*
+        times in a row.
+
+        This function logs the status object after the first status call, and after subsequent
+        calls if the status object has changed.
+
+        Example::
+
+            juju = jubilant.Juju()
+            juju.deploy('snappass-test')
+            juju.wait(jubilant.all_active)
+
+            # Or something more complex: wait specifically for 'snappass-test' to be active,
+            # and raise if any app or unit is seen in "error" status while waiting.
+            juju.wait(
+                lambda status: jubilant.all_active(status, 'snappass-test'),
+                error=jubilant.any_error,
+            )
+
+        Args:
+            ready: Callable that takes a :class:`Status` object and returns true when the wait
+                should be considered ready. It needs to return true *successes* times in a row
+                before ``wait`` returns.
+            error: Callable that takes a :class:`Status` object and returns true when ``wait``
+                should raise an error (:class:`WaitError`).
+            delay: Delay in seconds between status calls.
+            timeout: Overall timeout; :class:`TimeoutError` is raised if this is reached.
+                If not specified, uses the *wait_timeout* specified when the instance was created.
+            successes: Number of times *ready* must return true for the wait to succeed.
+
+        Raises:
+            TimeoutError: If the *timeout* is reached. A string representation
+                of the last status, if any, is added as an exception note.
+            WaitError: If the *error* callable returns True. A string representation
+                of the last status is added as an exception note.
+        """
+        if timeout is None:
+            timeout = self.wait_timeout
+
+        status = None
+        success_count = 0
+        start = time.monotonic()
+
+        while time.monotonic() - start < timeout:
+            prev_status = status
+
+            stdout, _ = self._cli('status', '--format', 'json', log=False)
+            result = json.loads(stdout)
+            status = Status._from_dict(result)
+
+            if status != prev_status:
+                diff = _status_diff(prev_status, status)
+                if diff:
+                    logger_wait.info('wait: status changed:\n%s', diff)
+
+            if error is not None and error(status):
+                raise jubilant.WaitError(
+                    f'error function {error.__qualname__} returned true\n{status}'
+                )
+
+            if ready(status):
+                success_count += 1
+                if success_count >= successes:
+                    return status
+            else:
+                success_count = 0
+
+            time.sleep(delay)
+
+        if status is None:
+            raise TimeoutError(f'wait timed out after {timeout}s')
+        raise TimeoutError(f'wait timed out after {timeout}s\n{status}')
+
+
+def _status_diff(old: Status | None, new: Status) -> str:
+    """Return a line-based diff of two status objects."""
+    if old is None:
+        old_lines = []
+    else:
+        old_lines = [line for line in _pretty.gron(old) if _status_line_ok(line)]
+    new_lines = [line for line in _pretty.gron(new) if _status_line_ok(line)]
+    return '\n'.join(_pretty.diff(old_lines, new_lines))
+
+
+def _status_line_ok(line: str) -> bool:
+    """Return whether the status line should be included in the diff."""
+    # Exclude controller timestamp as it changes every update and is just noise.
+    field, _, _ = line.partition(' = ')
+    if field == '.controller.timestamp':
+        return False
+    # Exclude status-updated-since timestamps as they just add noise (and log lines already
+    # include timestamps).
+    if field.endswith('.since'):
+        return False
+    return True
 
 
 def _base_to_series(base: str) -> str:
