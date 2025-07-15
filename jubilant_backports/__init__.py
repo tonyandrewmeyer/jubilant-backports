@@ -6,8 +6,6 @@ from jubilant import (
     CLIError,
     ConfigValue,
     SecretURI,
-    Task,
-    TaskError,
     WaitError,
     all_active,
     all_agents_idle,
@@ -24,6 +22,8 @@ from jubilant import (
 
 from . import statustypes
 from ._juju import Juju29 as Juju
+from ._task import Task29 as Task
+from ._task import TaskError29 as TaskError
 from ._test_helpers import temp_model
 from .statustypes import Status
 

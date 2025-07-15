@@ -12,8 +12,8 @@ from typing import Any, overload
 import jubilant
 from jubilant import _yaml
 from jubilant._juju import _format_config
-from jubilant._task import Task
 
+from ._task import Task29 as Task
 from .statustypes import Status
 
 
@@ -217,7 +217,7 @@ class Juju29(jubilant.Juju):
     @overload
     def exec(self, command: str, *args: str, unit: str, wait: float | None = None) -> Task: ...
 
-    def exec(
+    def exec(  # type: ignore
         self,
         command: str,
         *args: str,
@@ -283,6 +283,8 @@ class Juju29(jubilant.Juju):
 
         # Command doesn't return any stdout if no units exist.
         results: list[dict[str, Any]] = json.loads(stdout) if stdout.strip() else []
+        # In Juju 2.9, we get 'machine' or 'unit', 'return-code', 'stdout', and 'stderr' keys.
+        # 'stdout' or 'stderr' are missing if nothing was written to them.
         if machine is not None:
             for result in results:
                 if 'machine' in result and result['machine'] == str(machine):
@@ -343,7 +345,7 @@ class Juju29(jubilant.Juju):
         revision: int | None = None,
         storage: Mapping[str, str] | None = None,
         trust: bool = False,
-    ):
+    ) -> None:
         """Refresh (upgrade) an application's charm.
 
         Args:
@@ -411,7 +413,7 @@ class Juju29(jubilant.Juju):
         params: Mapping[str, Any] | None = None,
         *,
         wait: float | None = None,
-    ) -> Task:
+    ) -> Task | jubilant.Task:
         """Run an action on the given unit and wait for the result.
 
         Note: this method does not support running an action on multiple units
