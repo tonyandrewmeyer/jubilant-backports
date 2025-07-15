@@ -278,6 +278,13 @@ class Juju29(jubilant.Juju):
             if 'timed out' in exc.stderr:
                 msg = f'timed out waiting for command, stderr:\n{exc.stderr}'
                 raise TimeoutError(msg) from None
+            if 'not found' in exc.stderr:
+                if machine is not None:
+                    raise ValueError(
+                        f'machine {machine!r} not found, stderr:\n{exc.stderr}'
+                    ) from None
+                else:
+                    raise ValueError(f'unit {unit!r} not found, stderr:\n{exc.stderr}') from None
             # The "juju exec" CLI command itself fails if the exec'd command fails.
             if 'task failed' not in exc.stderr:
                 raise
@@ -446,9 +453,11 @@ class Juju29(jubilant.Juju):
         if self.cli_major_version >= 3:
             return super().run(unit, action, params, wait=wait)
 
-        args = ['run-action', '--format', 'json', unit, action, '--wait']
-        if wait is not None:
-            args.extend([f'{wait}s'])
+        args = ['run-action', '--format', 'json', unit, action]
+        if wait is None:
+            args.append('--wait')
+        else:
+            args.append(f'--wait={wait}s')
 
         params_file = None
         if params is not None:

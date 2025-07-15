@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 
+import jubilant as real_jubilant
 import pytest
 
 import jubilant_backports as jubilant
@@ -32,23 +33,21 @@ def test_run_success(juju: Juju29):
 
 
 def test_run_error(juju: Juju29):
-    with pytest.raises(jubilant.TaskError) as excinfo:
+    with pytest.raises((jubilant.TaskError, real_jubilant.TaskError)) as excinfo:
         juju.run('testdb/0', 'do-thing', {'error': 'ERR'})
     task = excinfo.value.task
     assert not task.success
-    if juju.cli_major_version != 2:
-        assert task.status == 'failed'  # type: ignore
+    assert task.status == 'failed'  # type: ignore
     assert task.return_code == 0  # return_code is 0 even if action fails
     assert task.message == 'failed with error: ERR'  # type: ignore
 
 
 def test_run_exception(juju: Juju29):
-    with pytest.raises(jubilant.TaskError) as excinfo:
+    with pytest.raises((jubilant.TaskError, real_jubilant.TaskError)) as excinfo:
         juju.run('testdb/0', 'do-thing', {'exception': 'EXC'})
     task = excinfo.value.task
     assert not task.success
-    if juju.cli_major_version != 2:
-        assert task.status == 'failed'  # type: ignore
+    assert task.status == 'failed'  # type: ignore
     assert task.return_code != 0
     assert 'EXC' in task.stderr
 
@@ -81,7 +80,7 @@ def test_exec_success(juju: Juju29):
 
 
 def test_exec_error(juju: Juju29):
-    with pytest.raises(jubilant.TaskError) as excinfo:
+    with pytest.raises((jubilant.TaskError, real_jubilant.TaskError)) as excinfo:
         juju.exec('sleep x', unit='testdb/0')
     task = excinfo.value.task
     assert not task.success
@@ -111,10 +110,11 @@ def test_ssh_and_scp(juju: Juju29):
 
     output = juju.ssh('snappass-test/0', 'ls', '/charm/containers')
     assert output.split() == ['redis', 'snappass']
+    expected_pebble = 'pebble' if juju.cli_major_version >= 3 else 'pebble.socket'
     output = juju.ssh('snappass-test/0', 'ls', '/charm/container', container='snappass')
-    assert 'pebble' in output.split()
+    assert expected_pebble in output.split()
     output = juju.ssh('snappass-test/0', 'ls', '/charm/container', container='redis')
-    assert 'pebble' in output.split()
+    assert expected_pebble in output.split()
 
     juju.scp('snappass-test/0:agents/unit-snappass-test-0/charm/src/charm.py', 'charm.py')
     charm_src = pathlib.Path('charm.py').read_text()
