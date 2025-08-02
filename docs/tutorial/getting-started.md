@@ -133,7 +133,7 @@ def juju():
 You've now learned the basics of Jubilant-backports! To learn more:
 
 - Look over the [`jubilant_backports` API reference](/reference/jubilant_backports)
-- See [Jubilant-backports's own integration tests](https://github.com/canonical/jubilant-backports/tree/main/tests/integration) for more examples of using `Juju` methods
-- See [Jubilant-backports's `conftest.py`](https://github.com/canonical/jubilant-backports/blob/main/tests/integration/conftest.py) with a `juju` fixture that has a `--keep-models` command-line argument, and prints the `juju debug-log` on test failure
+- See [Jubilant-backports's own integration tests](https://github.com/tonyandrewmeyer/jubilant-backports/tree/main/tests/integration) for more examples of using `Juju` methods
+- See [Jubilant-backports's `conftest.py`](https://github.com/tonyandrewmeyer/jubilant-backports/blob/main/tests/integration/conftest.py) with a `juju` fixture that has a `--keep-models` command-line argument, and prints the `juju debug-log` on test failure
 
-If you have any problems or want to request new features, please [open an issue](https://github.com/canonical/jubilant-backports/issues/new).
+If you have any problems or want to request new features, please [open an issue](https://github.com/tonyandrewmeyer/jubilant-backports/issues/new).
