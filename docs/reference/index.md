@@ -4,16 +4,16 @@
 :maxdepth: 1
 :hidden:
 
-jubilant module <jubilant>
+jubilant_backports module <jubilant_backports>
 statustypes module <statustypes>
 ```
 
-These guides provide technical information about Jubilant.
+These guides provide technical information about Jubilant-backports.
 
 
-## `jubilant` module
+## `jubilant_backports` module
 
-Jubilant has a type-annotated, Pythonic API.
+Jubilant-backports has a type-annotated, Pythonic API.
 
-* [API reference for the `jubilant` module](./jubilant)
-* [API reference for the `jubilant.statustypes` module](./statustypes)
+* [API reference for the `jubilant_backports` module](./jubilant_backports)
+* [API reference for the `jubilant_backports.statustypes` module](./statustypes)

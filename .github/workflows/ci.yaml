@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - name: Run linting
         run: make lint
@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - name: Run static type checks
         run: make static
@@ -49,7 +49,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.8", "3.10", "3.12", "3.13"]
-        juju-version: ["2", "3"]
 
     steps:
       - name: Check out repo
@@ -63,7 +62,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - name: Run unit tests
         run: make unit
@@ -71,8 +70,13 @@ jobs:
   integration-k8s:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        juju-version: ["2.9", "3"]
+
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-k8s
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.juju-version}}-k8s
       cancel-in-progress: true
 
     steps:
@@ -82,7 +86,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - name: Install concierge
         run: sudo snap install --classic concierge
@@ -99,8 +103,13 @@ jobs:
   integration-machine:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        juju-version: ["2.9", "3"]
+
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-machine
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.juju-version}}-machine
       cancel-in-progress: true
 
     steps:
@@ -110,7 +119,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - name: Install concierge
         run: sudo snap install --classic concierge

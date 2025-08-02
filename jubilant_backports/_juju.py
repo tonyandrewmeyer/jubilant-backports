@@ -3,21 +3,26 @@ from __future__ import annotations
 import contextlib
 import functools
 import json
+import logging
 import os
 import pathlib
 import tempfile
+import time
 from collections.abc import Iterable, Mapping
-from typing import Any, overload
+from typing import Any, Callable, overload
 
 import jubilant
-from jubilant import _yaml
+from jubilant import _pretty, _yaml
 from jubilant._juju import _format_config
-from jubilant._task import Task
 
+from ._task import ExecTask29 as ExecTask
+from ._task import Task29 as Task
 from .statustypes import Status
 
+logger_wait = logging.getLogger('jubilant.wait')
 
-class Juju(jubilant.Juju):
+
+class Juju29(jubilant.Juju):
     """Instantiate this class to run Juju commands.
 
     Most methods directly call a single Juju CLI command. If a CLI command doesn't yet exist as a
@@ -212,19 +217,21 @@ class Juju(jubilant.Juju):
         self.cli(*args)
 
     @overload
-    def exec(self, command: str, *args: str, machine: int, wait: float | None = None) -> Task: ...
+    def exec(
+        self, command: str, *args: str, machine: int, wait: float | None = None
+    ) -> ExecTask: ...
 
     @overload
-    def exec(self, command: str, *args: str, unit: str, wait: float | None = None) -> Task: ...
+    def exec(self, command: str, *args: str, unit: str, wait: float | None = None) -> ExecTask: ...
 
-    def exec(
+    def exec(  # type: ignore
         self,
         command: str,
         *args: str,
         machine: int | None = None,
         unit: str | None = None,
         wait: float | None = None,
-    ) -> Task:
+    ) -> ExecTask:
         """Run the command on the remote target specified.
 
         You must specify either *machine* or *unit*, but not both.
@@ -275,6 +282,13 @@ class Juju(jubilant.Juju):
             if 'timed out' in exc.stderr:
                 msg = f'timed out waiting for command, stderr:\n{exc.stderr}'
                 raise TimeoutError(msg) from None
+            if 'not found' in exc.stderr:
+                if machine is not None:
+                    raise ValueError(
+                        f'machine {machine!r} not found, stderr:\n{exc.stderr}'
+                    ) from None
+                else:
+                    raise ValueError(f'unit {unit!r} not found, stderr:\n{exc.stderr}') from None
             # The "juju exec" CLI command itself fails if the exec'd command fails.
             if 'task failed' not in exc.stderr:
                 raise
@@ -282,16 +296,20 @@ class Juju(jubilant.Juju):
             stderr = exc.stderr
 
         # Command doesn't return any stdout if no units exist.
-        results: dict[str, Any] = json.loads(stdout) if stdout.strip() else {}
+        results: list[dict[str, Any]] = json.loads(stdout) if stdout.strip() else []
         if machine is not None:
-            if str(machine) not in results:
+            for result in results:
+                if 'machine' in result and result['machine'] == str(machine):
+                    break
+            else:
                 raise ValueError(f'machine {machine!r} not found, stderr:\n{stderr}')
-            result = results[str(machine)]
         else:
-            if unit not in results:
+            for result in results:
+                if 'unit' in result and result['unit'] == unit:
+                    break
+            else:
                 raise ValueError(f'unit {unit!r} not found, stderr:\n{stderr}')
-            result = results[unit]
-        task = Task._from_dict(result)
+        task = ExecTask._from_dict(result)
         task.raise_on_failure()
         return task
 
@@ -339,7 +357,7 @@ class Juju(jubilant.Juju):
         revision: int | None = None,
         storage: Mapping[str, str] | None = None,
         trust: bool = False,
-    ):
+    ) -> None:
         """Refresh (upgrade) an application's charm.
 
         Args:
@@ -400,14 +418,14 @@ class Juju(jubilant.Juju):
         if trust:
             self.trust(app)
 
-    def run(
+    def run(  # type: ignore
         self,
         unit: str,
         action: str,
         params: Mapping[str, Any] | None = None,
         *,
         wait: float | None = None,
-    ) -> Task:
+    ) -> Task | jubilant.Task:
         """Run an action on the given unit and wait for the result.
 
         Note: this method does not support running an action on multiple units
@@ -440,8 +458,10 @@ class Juju(jubilant.Juju):
             return super().run(unit, action, params, wait=wait)
 
         args = ['run-action', '--format', 'json', unit, action]
-        if wait is not None:
-            args.extend(['--wait', f'{wait}s'])
+        if wait is None:
+            args.append('--wait')
+        else:
+            args.append(f'--wait={wait}s')
 
         params_file = None
         if params is not None:
@@ -455,7 +475,7 @@ class Juju(jubilant.Juju):
             try:
                 stdout, stderr = self._cli(*args)
             except jubilant.CLIError as exc:
-                if 'timed out' in exc.stderr:
+                if 'timed out' in exc.stderr or 'timeout reached' in exc.stderr:
                     msg = f'timed out waiting for action, stderr:\n{exc.stderr}'
                     raise TimeoutError(msg) from None
                 # The "juju run" CLI command fails if the action has an uncaught exception.
@@ -466,22 +486,143 @@ class Juju(jubilant.Juju):
 
             # Command doesn't return any stdout if no units exist.
             all_tasks: dict[str, Any] = json.loads(stdout) if stdout.strip() else {}
-            if unit not in all_tasks:
+            full_unit_name = f'unit-{unit.replace("/", "-")}'
+            if full_unit_name not in all_tasks:
                 raise ValueError(
                     f'action {action!r} not defined or unit {unit!r} not found, stderr:\n{stderr}'
                 )
-            task = Task._from_dict(all_tasks[unit])
+            task = Task._from_dict(all_tasks[full_unit_name])
             task.raise_on_failure()
             return task
         finally:
             if params_file is not None:
                 os.remove(params_file.name)
 
-    def status(self) -> Status:
+    def status(self) -> Status | jubilant.Status:  # type: ignore
         """Fetch the status of the current model, including its applications and units."""
         stdout = self.cli('status', '--format', 'json')
         result = json.loads(stdout)
-        return Status._from_dict(result)
+        # The status we get back depends on the Juju controller version, not the
+        # CLI version.
+        if result['model']['version'].startswith('2'):
+            return Status._from_dict(result)
+        return jubilant.Status._from_dict(result)
+
+    def wait(  # type: ignore
+        self,
+        ready: Callable[[Status], bool],
+        *,
+        error: Callable[[Status], bool] | None = None,
+        delay: float = 1.0,
+        timeout: float | None = None,
+        successes: int = 3,
+    ) -> Status | jubilant.Status:
+        """Wait until ``ready(status)`` returns true.
+
+        This fetches the Juju status repeatedly (waiting *delay* seconds between each call),
+        and returns the last status after the *ready* callable returns true for *successes*
+        times in a row.
+
+        This function logs the status object after the first status call, and after subsequent
+        calls if the status object has changed.
+
+        Example::
+
+            juju = jubilant.Juju()
+            juju.deploy('snappass-test')
+            juju.wait(jubilant.all_active)
+
+            # Or something more complex: wait specifically for 'snappass-test' to be active,
+            # and raise if any app or unit is seen in "error" status while waiting.
+            juju.wait(
+                lambda status: jubilant.all_active(status, 'snappass-test'),
+                error=jubilant.any_error,
+            )
+
+        Args:
+            ready: Callable that takes a :class:`Status` object and returns true when the wait
+                should be considered ready. It needs to return true *successes* times in a row
+                before ``wait`` returns.
+            error: Callable that takes a :class:`Status` object and returns true when ``wait``
+                should raise an error (:class:`WaitError`).
+            delay: Delay in seconds between status calls.
+            timeout: Overall timeout; :class:`TimeoutError` is raised if this is reached.
+                If not specified, uses the *wait_timeout* specified when the instance was created.
+            successes: Number of times *ready* must return true for the wait to succeed.
+
+        Raises:
+            TimeoutError: If the *timeout* is reached. A string representation
+                of the last status, if any, is added as an exception note.
+            WaitError: If the *error* callable returns True. A string representation
+                of the last status is added as an exception note.
+        """
+        if self.cli_major_version >= 3:
+            return super().wait(
+                ready,  # type: ignore
+                error=error,  # type: ignore
+                delay=delay,
+                timeout=timeout,
+                successes=successes,
+            )
+        if timeout is None:
+            timeout = self.wait_timeout
+
+        status = None
+        success_count = 0
+        start = time.monotonic()
+
+        while time.monotonic() - start < timeout:
+            prev_status = status
+
+            stdout, _ = self._cli('status', '--format', 'json', log=False)
+            result = json.loads(stdout)
+            status = Status._from_dict(result)
+
+            if status != prev_status:
+                diff = _status_diff(prev_status, status)
+                if diff:
+                    logger_wait.info('wait: status changed:\n%s', diff)
+
+            if error is not None and error(status):
+                raise jubilant.WaitError(
+                    f'error function {error.__qualname__} returned true\n{status}'
+                )
+
+            if ready(status):
+                success_count += 1
+                if success_count >= successes:
+                    return status
+            else:
+                success_count = 0
+
+            time.sleep(delay)
+
+        if status is None:
+            raise TimeoutError(f'wait timed out after {timeout}s')
+        raise TimeoutError(f'wait timed out after {timeout}s\n{status}')
+
+
+def _status_diff(old: Status | None, new: Status) -> str:
+    """Return a line-based diff of two status objects."""
+    if old is None:
+        old_lines = []
+    else:
+        old_lines = [line for line in _pretty.gron(old) if _status_line_ok(line)]
+    new_lines = [line for line in _pretty.gron(new) if _status_line_ok(line)]
+    return '\n'.join(_pretty.diff(old_lines, new_lines))
+
+
+def _status_line_ok(line: str) -> bool:
+    """Return whether the status line should be included in the diff."""
+    # Exclude controller timestamp as it changes every update and is just noise.
+    field, _, _ = line.partition(' = ')
+    if field == '.controller.timestamp':
+        return False
+    # Exclude status-updated-since timestamps as they just add noise (and log lines already
+    # include timestamps).
+    if field.endswith('.since'):
+        return False
+    return True
 
 
 def _base_to_series(base: str) -> str:

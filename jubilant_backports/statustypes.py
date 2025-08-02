@@ -1,24 +1,49 @@
-"""Dataclasses that contain parsed output from ``juju status --format=json``."""
+"""Dataclasses used to hold parsed output from "juju status --format=json"."""
 
 from __future__ import annotations
 
 import dataclasses
 from typing import Any
 
+from jubilant import Status as JubilantStatus
 from jubilant import _pretty
+
+# For all classes that are identical in Juju 3.x, reuse the classes from Jubilant.
+# For classes that differ in Juju 2.9, use the exported definition rather than
+# inheriting from the Jubilant one.
+from jubilant.statustypes import (
+    CombinedStorage,
+    ControllerStatus,
+    EntityStatus,
+    FilesystemAttachment,
+    FilesystemAttachments,
+    FilesystemInfo,
+    LxdProfileContents,
+    NetworkInterface,
+    OfferStatus,
+    RemoteAppStatus,
+    RemoteEndpoint,
+    StatusInfo,
+    StorageAttachments,
+    StorageInfo,
+    UnitStorageAttachment,
+    VolumeAttachment,
+    VolumeAttachments,
+    VolumeInfo,
+)
 
 __all__ = [
     'AppStatus',
-    'AppStatusRelation',
+    'BranchStatus',
     'CombinedStorage',
     'ControllerStatus',
     'EntityStatus',
     'FilesystemAttachment',
     'FilesystemAttachments',
     'FilesystemInfo',
-    'FormattedBase',
     'LxdProfileContents',
     'MachineStatus',
+    'MeterStatus',
     'ModelStatus',
     'NetworkInterface',
     'OfferStatus',
@@ -37,53 +62,15 @@ __all__ = [
 
 
 @dataclasses.dataclass(frozen=True)
-class FormattedBase:
-    name: str
-    channel: str
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> FormattedBase:
-        return cls(
-            name=d['name'],
-            channel=d['channel'],
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class StatusInfo:
-    current: str = ''
+class MeterStatus:
+    color: str = ''
     message: str = ''
-    reason: str = ''
-    since: str = ''
-    version: str = ''
-    life: str = ''
 
     @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> StatusInfo:
-        if 'status-error' in d:
-            return cls(current='failed', message=d['status-error'])
+    def _from_dict(cls, d: dict[str, Any]) -> MeterStatus:
         return cls(
-            current=d.get('current') or '',
+            color=d.get('color') or '',
             message=d.get('message') or '',
-            reason=d.get('reason') or '',
-            since=d.get('since') or '',
-            version=d.get('version') or '',
-            life=d.get('life') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class AppStatusRelation:
-    related_app: str = ''
-    interface: str = ''
-    scope: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> AppStatusRelation:
-        return cls(
-            related_app=d.get('related-application') or '',
-            interface=d.get('interface') or '',
-            scope=d.get('scope') or '',
         )
 
 
@@ -91,6 +78,7 @@ class AppStatusRelation:
 class UnitStatus:
     workload_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
     juju_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
+    meter_status: MeterStatus = dataclasses.field(default_factory=MeterStatus)
     leader: bool = False
     upgrading_from: str = ''
     machine: str = ''
@@ -99,6 +87,7 @@ class UnitStatus:
     address: str = ''
     provider_id: str = ''
     subordinates: dict[str, UnitStatus] = dataclasses.field(default_factory=dict)  # type: ignore
+    branch: str = ''
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> UnitStatus:
@@ -116,6 +105,9 @@ class UnitStatus:
             juju_status=(
                 StatusInfo._from_dict(d['juju-status']) if 'juju-status' in d else StatusInfo()
             ),
+            meter_status=(
+                MeterStatus._from_dict(d['meter-status']) if 'meter-status' in d else MeterStatus()
+            ),
             leader=d.get('leader') or False,
             upgrading_from=d.get('upgrading-from') or '',
             machine=d.get('machine') or '',
@@ -128,6 +120,7 @@ class UnitStatus:
                 if 'subordinates' in d
                 else {}
             ),
+            branch=d.get('branch') or '',
         )
 
     @property
@@ -159,12 +152,13 @@ class UnitStatus:
 @dataclasses.dataclass(frozen=True)
 class AppStatus:
     charm: str
+    series: str
+    os: str
     charm_origin: str
     charm_name: str
     charm_rev: int
     exposed: bool
 
-    base: FormattedBase | None = None
     charm_channel: str = ''
     charm_version: str = ''
     charm_profile: str = ''
@@ -174,7 +168,7 @@ class AppStatus:
     address: str = ''
     life: str = ''
     app_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
-    relations: dict[str, list[AppStatusRelation]] = dataclasses.field(default_factory=dict)  # type: ignore
+    relations: dict[str, list[str]] = dataclasses.field(default_factory=dict)  # type: ignore
     subordinate_to: list[str] = dataclasses.field(default_factory=list)  # type: ignore
     units: dict[str, UnitStatus] = dataclasses.field(default_factory=dict)  # type: ignore
     version: str = ''
@@ -185,6 +179,8 @@ class AppStatus:
         if 'status-error' in d:
             return cls(
                 charm='<failed>',
+                series='<failed>',
+                os='<failed>',
                 charm_origin='<failed>',
                 charm_name='<failed>',
                 charm_rev=-1,
@@ -193,11 +189,12 @@ class AppStatus:
             )
         return cls(
             charm=d['charm'],
+            series=d['series'],
+            os=d['os'],
             charm_origin=d['charm-origin'],
             charm_name=d['charm-name'],
             charm_rev=d['charm-rev'],
             exposed=d['exposed'],
-            base=FormattedBase._from_dict(d['base']) if 'base' in d else None,
             charm_channel=d.get('charm-channel') or '',
             charm_version=d.get('charm-version') or '',
             charm_profile=d.get('charm-profile') or '',
@@ -211,14 +208,7 @@ class AppStatus:
                 if 'application-status' in d
                 else StatusInfo()
             ),
-            relations=(
-                {
-                    k: [AppStatusRelation._from_dict(x) for x in v]
-                    for k, v in d['relations'].items()
-                }
-                if 'relations' in d
-                else {}
-            ),
+            relations=d.get('relations') or {},
             subordinate_to=d.get('subordinate-to') or [],
             units=(
                 {k: UnitStatus._from_dict(v) for k, v in d['units'].items()}
@@ -256,299 +246,26 @@ class AppStatus:
 
 
 @dataclasses.dataclass(frozen=True)
-class EntityStatus:
-    current: str = ''
-    message: str = ''
-    since: str = ''
+class BranchStatus:
+    ref: str = ''
+    created: str = ''
+    created_by: str = ''
+    active: bool = False
 
     @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> EntityStatus:
+    def _from_dict(cls, d: dict[str, Any]) -> BranchStatus:
         return cls(
-            current=d.get('current') or '',
-            message=d.get('message') or '',
-            since=d.get('since') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class UnitStorageAttachment:
-    machine: str = ''
-    location: str = ''
-    life: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> UnitStorageAttachment:
-        return cls(
-            machine=d.get('machine') or '',
-            location=d.get('location') or '',
-            life=d.get('life') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class StorageAttachments:
-    units: dict[str, UnitStorageAttachment]
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> StorageAttachments:
-        return cls(
-            units={k: UnitStorageAttachment._from_dict(v) for k, v in d['units'].items()},
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class StorageInfo:
-    kind: str
-    status: EntityStatus
-    persistent: bool
-
-    life: str = ''
-    attachments: StorageAttachments | None = None
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> StorageInfo:
-        return cls(
-            kind=d['kind'],
-            status=EntityStatus._from_dict(d['status']),
-            persistent=d['persistent'],
-            life=d.get('life') or '',
-            attachments=(
-                StorageAttachments._from_dict(d['attachments']) if 'attachments' in d else None
-            ),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class FilesystemAttachment:
-    mount_point: str
-    read_only: bool
-
-    life: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> FilesystemAttachment:
-        return cls(
-            mount_point=d['mount-point'],
-            read_only=d['read-only'],
-            life=d.get('life') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class FilesystemAttachments:
-    machines: dict[str, FilesystemAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-    containers: dict[str, FilesystemAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-    units: dict[str, UnitStorageAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> FilesystemAttachments:
-        return cls(
-            machines=(
-                {k: FilesystemAttachment._from_dict(v) for k, v in d['machines'].items()}
-                if 'machines' in d
-                else {}
-            ),
-            containers=(
-                {k: FilesystemAttachment._from_dict(v) for k, v in d['containers'].items()}
-                if 'containers' in d
-                else {}
-            ),
-            units=(
-                {k: UnitStorageAttachment._from_dict(v) for k, v in d['units'].items()}
-                if 'units' in d
-                else {}
-            ),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class FilesystemInfo:
-    size: int
-
-    provider_id: str = ''
-    volume: str = ''
-    storage: str = ''
-    attachments: FilesystemAttachments = dataclasses.field(default_factory=FilesystemAttachments)
-    pool: str = ''
-    life: str = ''
-    status: EntityStatus = dataclasses.field(default_factory=EntityStatus)
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> FilesystemInfo:
-        return cls(
-            size=d['size'],
-            provider_id=d.get('provider-id') or '',
-            volume=d.get('volume') or '',
-            storage=d.get('storage') or '',
-            attachments=(
-                FilesystemAttachments._from_dict(d['attachments'])
-                if 'attachments' in d
-                else FilesystemAttachments()
-            ),
-            pool=d.get('pool') or '',
-            life=d.get('life') or '',
-            status=EntityStatus._from_dict(d['status']) if 'status' in d else EntityStatus(),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class VolumeAttachment:
-    read_only: bool
-
-    device: str = ''
-    device_link: str = ''
-    bus_address: str = ''
-    life: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> VolumeAttachment:
-        return cls(
-            read_only=d['read-only'],
-            device=d.get('device') or '',
-            device_link=d.get('device-link') or '',
-            bus_address=d.get('bus-address') or '',
-            life=d.get('life') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class VolumeAttachments:
-    machines: dict[str, VolumeAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-    containers: dict[str, VolumeAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-    units: dict[str, UnitStorageAttachment] = dataclasses.field(default_factory=dict)  # type: ignore
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> VolumeAttachments:
-        return cls(
-            machines=(
-                {k: VolumeAttachment._from_dict(v) for k, v in d['machines'].items()}
-                if 'machines' in d
-                else {}
-            ),
-            containers=(
-                {k: VolumeAttachment._from_dict(v) for k, v in d['containers'].items()}
-                if 'containers' in d
-                else {}
-            ),
-            units=(
-                {k: UnitStorageAttachment._from_dict(v) for k, v in d['units'].items()}
-                if 'units' in d
-                else {}
-            ),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class VolumeInfo:
-    size: int
-    persistent: bool
-
-    provider_id: str = ''
-    storage: str = ''
-    attachments: VolumeAttachments = dataclasses.field(default_factory=VolumeAttachments)
-    pool: str = ''
-    hardware_id: str = ''
-    wwn: str = ''
-    life: str = ''
-    status: EntityStatus = dataclasses.field(default_factory=EntityStatus)
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> VolumeInfo:
-        return cls(
-            size=d['size'],
-            persistent=d['persistent'],
-            provider_id=d.get('provider-id') or '',
-            storage=d.get('storage') or '',
-            attachments=(
-                VolumeAttachments._from_dict(d['attachments'])
-                if 'attachments' in d
-                else VolumeAttachments()
-            ),
-            pool=d.get('pool') or '',
-            hardware_id=d.get('hardware-id') or '',
-            wwn=d.get('wwn') or '',
-            life=d.get('life') or '',
-            status=EntityStatus._from_dict(d['status']) if 'status' in d else EntityStatus(),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class CombinedStorage:
-    storage: dict[str, StorageInfo] = dataclasses.field(default_factory=dict)  # type: ignore
-    filesystems: dict[str, FilesystemInfo] = dataclasses.field(default_factory=dict)  # type: ignore
-    volumes: dict[str, VolumeInfo] = dataclasses.field(default_factory=dict)  # type: ignore
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> CombinedStorage:
-        return cls(
-            storage=(
-                {k: StorageInfo._from_dict(v) for k, v in d['storage'].items()}
-                if 'storage' in d
-                else {}
-            ),
-            filesystems=(
-                {k: FilesystemInfo._from_dict(v) for k, v in d['filesystems'].items()}
-                if 'filesystems' in d
-                else {}
-            ),
-            volumes=(
-                {k: VolumeInfo._from_dict(v) for k, v in d['volumes'].items()}
-                if 'volumes' in d
-                else {}
-            ),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class ControllerStatus:
-    timestamp: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> ControllerStatus:
-        return cls(
-            timestamp=d.get('timestamp') or '',
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class LxdProfileContents:
-    config: dict[str, str]
-    description: str
-    devices: dict[str, dict[str, str]]
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> LxdProfileContents:
-        return cls(
-            config=d['config'],
-            description=d['description'],
-            devices=d['devices'],
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class NetworkInterface:
-    ip_addresses: list[str]
-    mac_address: str
-    is_up: bool
-
-    gateway: str = ''
-    dns_nameservers: list[str] = dataclasses.field(default_factory=list)  # type: ignore
-    space: str = ''
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> NetworkInterface:
-        return cls(
-            ip_addresses=d['ip-addresses'],
-            mac_address=d['mac-address'],
-            is_up=d['is-up'],
-            gateway=d.get('gateway') or '',
-            dns_nameservers=d.get('dns-nameservers') or [],
-            space=d.get('space') or '',
+            ref=d.get('ref') or '',
+            created=d.get('created') or '',
+            created_by=d.get('created-by') or '',
+            active=d.get('active') or False,
         )
 
 
 @dataclasses.dataclass(frozen=True)
 class MachineStatus:
+    series: str
+
     juju_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
     hostname: str = ''
     dns_name: str = ''
@@ -557,7 +274,6 @@ class MachineStatus:
     display_name: str = ''
     machine_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
     modification_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
-    base: FormattedBase | None = None
     network_interfaces: dict[str, NetworkInterface] = dataclasses.field(default_factory=dict)  # type: ignore
     containers: dict[str, MachineStatus] = dataclasses.field(default_factory=dict)  # type: ignore
     constraints: str = ''
@@ -570,10 +286,12 @@ class MachineStatus:
     def _from_dict(cls, d: dict[str, Any]) -> MachineStatus:
         if 'status-error' in d:
             return cls(
+                series='<failed>',
                 juju_status=StatusInfo(current='failed', message=d['status-error']),
                 machine_status=StatusInfo(current='failed', message=d['status-error']),
             )
         return cls(
+            series=d['series'],
             juju_status=(
                 StatusInfo._from_dict(d['juju-status']) if 'juju-status' in d else StatusInfo()
             ),
@@ -592,7 +310,6 @@ class MachineStatus:
                 if 'modification-status' in d
                 else StatusInfo()
             ),
-            base=FormattedBase._from_dict(d['base']) if 'base' in d else None,
             network_interfaces=(
                 {k: NetworkInterface._from_dict(v) for k, v in d['network-interfaces'].items()}
                 if 'network-interfaces' in d
@@ -626,6 +343,8 @@ class ModelStatus:
     region: str = ''
     upgrade_available: str = ''
     model_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
+    meter_status: MeterStatus = dataclasses.field(default_factory=MeterStatus)
+    sla: str = ''
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ModelStatus:
@@ -640,80 +359,16 @@ class ModelStatus:
             model_status=(
                 StatusInfo._from_dict(d['model-status']) if 'model-status' in d else StatusInfo()
             ),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class RemoteEndpoint:
-    interface: str
-    role: str
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> RemoteEndpoint:
-        return cls(
-            interface=d['interface'],
-            role=d['role'],
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class OfferStatus:
-    app: str
-    endpoints: dict[str, RemoteEndpoint]
-
-    charm: str = ''
-    total_connected_count: int = 0
-    active_connected_count: int = 0
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> OfferStatus:
-        if 'status-error' in d:
-            return cls(app=f'<failed> ({d["status-error"]})', endpoints={})
-        return cls(
-            app=d['application'],
-            endpoints={k: RemoteEndpoint._from_dict(v) for k, v in d['endpoints'].items()},
-            charm=d.get('charm') or '',
-            total_connected_count=d.get('total-connected-count') or 0,
-            active_connected_count=d.get('active-connected-count') or 0,
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class RemoteAppStatus:
-    url: str
-
-    endpoints: dict[str, RemoteEndpoint] = dataclasses.field(default_factory=dict)  # type: ignore
-    life: str = ''
-    app_status: StatusInfo = dataclasses.field(default_factory=StatusInfo)
-    relations: dict[str, list[str]] = dataclasses.field(default_factory=dict)  # type: ignore
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> RemoteAppStatus:
-        if 'status-error' in d:
-            return cls(
-                url='<failed>',
-                app_status=StatusInfo(current='failed', message=d['status-error']),
-            )
-        return cls(
-            url=d['url'],
-            endpoints=(
-                {k: RemoteEndpoint._from_dict(v) for k, v in d['endpoints'].items()}
-                if 'endpoints' in d
-                else {}
+            meter_status=(
+                MeterStatus._from_dict(d['meter-status']) if 'meter-status' in d else MeterStatus()
             ),
-            life=d.get('life') or '',
-            app_status=(
-                StatusInfo._from_dict(d['application-status'])
-                if 'application-status' in d
-                else StatusInfo()
-            ),
-            relations=d.get('relations') or {},
+            sla=d.get('sla') or '',
         )
 
 
 @dataclasses.dataclass(frozen=True)
 class Status:
-    """Parsed version of the status object returned by ``juju status --format=json``."""
+    """Parsed version of the status object returned by "juju status --format=json"."""
 
     model: ModelStatus
     machines: dict[str, MachineStatus]
@@ -723,6 +378,7 @@ class Status:
     offers: dict[str, OfferStatus] = dataclasses.field(default_factory=dict)  # type: ignore
     storage: CombinedStorage = dataclasses.field(default_factory=CombinedStorage)
     controller: ControllerStatus = dataclasses.field(default_factory=ControllerStatus)
+    branches: dict[str, BranchStatus] = dataclasses.field(default_factory=dict)  # type: ignore
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Status:
@@ -748,6 +404,11 @@ class Status:
                 if 'controller' in d
                 else ControllerStatus()
             ),
+            branches=(
+                {k: BranchStatus._from_dict(v) for k, v in d['branches'].items()}
+                if 'branches' in d
+                else {}
+            ),
         )
 
     def __repr__(self) -> str:
@@ -764,7 +425,7 @@ class Status:
         This excludes the :attr:`controller` attribute, because that only has a timestamp that
         constantly updates.
         """
-        if not isinstance(other, Status):
+        if not isinstance(other, (Status, JubilantStatus)):
             return False
         for field in dataclasses.fields(self):
             if field.name == 'controller':

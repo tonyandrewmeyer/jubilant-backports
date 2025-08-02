@@ -57,5 +57,5 @@ Jubilant-backports is free software and released under the [Apache license, vers
 The Jubilant-backports project is sponsored by [Canonical Ltd](https://www.canonical.com).
 
 - [Code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)
-- [Contribute to the project](https://github.com/canonical/jubilant-backports?tab=readme-ov-file#contributing-and-developing)
-- [Development](https://github.com/canonical/jubilant-backports?tab=readme-ov-file#contributing-and-developing): how to make changes to Jubilant-backports and run its tests
+- [Contribute to the project](https://github.com/tonyandrewmeyer/jubilant-backports?tab=readme-ov-file#contributing-and-developing)
+- [Development](https://github.com/tonyandrewmeyer/jubilant-backports?tab=readme-ov-file#contributing-and-developing): how to make changes to Jubilant-backports and run its tests

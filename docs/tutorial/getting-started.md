@@ -1,30 +1,38 @@
-# Getting started with Jubilant
+# Getting started with Jubilant-backports
 
-In this tutorial, we'll learn how to install Jubilant, use it to run Juju commands, and write a simple charm integration test.
+```{important}
+Using Jubilant-backports is almost identical to using Jubilant. Make sure you [get started with Jubilant](https://canonical-jubilant.readthedocs-hosted.com/tutorial/getting-started/) first!
+```
 
-The tutorial assumes that you have a basic understanding of Juju and have already installed it. [Learn how to install the Juju CLI.](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/index.html#install-juju)
+In this tutorial, we'll learn how to install Jubilant-backports, substitute it for the regular Jubilant package, and write a simple charm integration test that will run against both Juju 2.9 and Juju 3.x.
+
+The tutorial assumes that you have a basic understanding of Juju and have already installed it. [Learn how to install the Juju CLI.](https://documentation.ubuntu.com/juju/2.9/howto/manage-juju/index.html#install-juju)
 
 
-## Install Jubilant
+## Install Jubilant-backports
 
-Jubilant is published to PyPI, so you can install and use it with your favorite Python package manager:
+Jubilant-backports is published to PyPI, so you can install and use it with your favorite Python package manager:
 
 ```
-$ pip install jubilant
+$ pip install jubilant-backports
 # or
-$ uv add jubilant
+$ uv add jubilant-backports
 ```
 
-Like the [Ops](https://github.com/canonical/operator) framework used by charms, Jubilant requires Python 3.8 or above.
+Like the 2.x releases of [Ops](https://github.com/canonical/operator) framework used by charms, Jubilant-backports requires Python 3.8 or above.
 
 
 ## Check your setup
 
-To check that Jubilant is working, use it to add a Juju model and check its status:
+To check that Jubilant-backports is working, use it to add a Juju model and check its status:
+
+```{tip}
+You can run this check with the 2.9 Juju CLI or a 3.x Juju CLI, against a 2.9 Juju controller or a 3.x Juju controller.
+```
 
 ```
 $ uv run python
->>> import jubilant
+>>> import jubilant_backports as jubilant
 >>> juju = jubilant.Juju()
 >>> juju.add_model('test')
 >>> juju.status()
@@ -32,18 +40,16 @@ Status(
   model=ModelStatus(
     name='test',
     type='caas',
-    controller='k8s',
-    cloud='my-k8s',
-    version='3.6.4',
+    controller='my-k8s-localhost',
+    cloud='microk8s',
+    version='2.9.50',
     region='localhost',
-    model_status=StatusInfo(
-      current='available',
-      since='22 Mar 2025 12:34:12+13:00',
-    ),
+    model_status=StatusInfo(current='available', since='15 Jul 2025 21:31:29+12:00'),
+    sla='unsupported',
   ),
   machines={},
   apps={},
-  controller=ControllerStatus(timestamp='12:34:17+13:00'),
+  controller=ControllerStatus(timestamp='21:31:37+12:00'),
 )
 ```
 
@@ -55,16 +61,45 @@ Model  Controller  Cloud/Region      Version  SLA          Timestamp
 test   k8s         my-k8s/localhost  3.6.4    unsupported  12:35:05+13:00
 
 Model "test" is empty.
+
+$ juju status --model test
+Model  Controller  Cloud/Region      Version  SLA          Timestamp
+test   k8s         my-k8s/localhost  2.9.50   unsupported  21:14:30+12:00
+
+Model "admin/test" is empty.
 ```
 
+## Substitute `jubilant_backports` for `jubilant`
+
+Jubilant-backports is a drop-in replacement for Jubilant. Only two steps are required:
+
+1. Replace `jubilant` in your dependencies with `jubilant_backports` (note that Jubilant-backports depends on Jubilant, so you'll still have it as a transitive dependency).
+2. Use `jubilant_backports` in your imports rather than `jubilant`. We recommend `import jubilant_backports as jubilant` (and `import jubilant_backports.statustypes as statustypes`) for minimal disruption.
+
+The Jubilant-backports `Juju` class will check the version of the `juju` CLI when objects are created. If it's Juju 3.x or higher, then the class is a simple wrapper around the Jubilant `Juju` class. If it's Juju 2.9, then you continue to use the familiar Jubilant `Juju` API, and the class will transparently translate CLI commands as required. Similarly, when using [](jubilant_backports.Juju.status), the class will inspect the status to determine the version of the controller, and return either a [](jubilant_backports.Status) or a Jubilant `Status`, as appropriate.
+
+Two extra attributes are available on the Jubilant-backports class, to inspect the version:
+
+```python
+>> import jubilant_backports as jubilant
+>>> juju = jubilant.Juju()
+>>> juju.cli_version
+'2.9.52-ubuntu-amd64'
+>>> juju.cli_major_version
+2
+```
+
+It's also possible to pass in the CLI version (`Juju(cli_version='2.9.0')`), but this should not be required in normal circumstances.
 
 ## Write a charm integration test
 
-We recommend using [pytest](https://docs.pytest.org/en/stable/) for writing tests. You can define a [pytest fixture](https://docs.pytest.org/en/stable/explanation/fixtures.html) to create a temporary Juju model for each test. The [](jubilant.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit.
+We recommend using [pytest](https://docs.pytest.org/en/stable/) for writing tests. You can define a [pytest fixture](https://docs.pytest.org/en/stable/explanation/fixtures.html) to create a temporary Juju model for each test. The [](jubilant_backports.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit. (Use this context manager rather than the Jubilant one, to make sure you get the right `Juju` class for the version of Juju you are using.)
 
 Here is a module-scoped fixture called `juju`, which you would normally define in [`conftest.py`](https://docs.pytest.org/en/stable/reference/fixtures.html#conftest-py-sharing-fixtures-across-multiple-files):
 
 ```python
+import jubilant_backports as jubilant
+
 @pytest.fixture(scope='module')
 def juju():
     with jubilant.temp_model() as juju:
@@ -74,7 +109,9 @@ def juju():
 Integration tests in a test file would use the fixture, operating on the temporary model:
 
 ```python
-def test_deploy(juju: jubilant.Juju):
+import jubilant_backports as jubilant
+
+def test_deploy(juju: jubilant.Juju):  # type: ignore
     juju.deploy('snappass-test')
     juju.wait(jubilant.all_active)
 
@@ -90,107 +127,13 @@ def juju():
     ...
 ```
 
-
-## Use a custom `wait` condition
-
-When waiting on a condition with [`Juju.wait`](jubilant.Juju.wait), you can use pre-defined helpers including [](jubilant.all_active) and [](jubilant.any_error). You can also define custom conditions for the *ready* and *error* parameters. This is typically done with inline `lambda` functions.
-
-For example, to deploy and wait till all the specified applications (`blog`, `mysql`, and `redis`) are "active":
-
-```python
-def test_active_apps(juju: jubilant.Juju):
-    for app in ['blog', 'mysql', 'redis']:
-        juju.deploy(app)
-    juju.integrate('blog', 'mysql')
-    juju.integrate('blog', 'redis')
-    juju.wait(
-        lambda status: jubilant.all_active(status, 'blog', 'mysql', 'redis'),
-    )
-```
-
-Or to test that the `myapp` charm starts up with application status "unknown":
-
-```python
-def test_unknown(juju: jubilant.Juju):
-    juju.deploy('myapp')
-    juju.wait(
-        lambda status: status.apps['myapp'].app_status.current == 'unknown',
-    )
-```
-
-There are also `is_*` properties on the [`AppStatus`](jubilant.statustypes.AppStatus) and [`UnitStatus`](jubilant.statustypes.UnitStatus) classes for the common statuses: `is_active`, `is_blocked`, `is_error`, `is_maintenance`, and `is_waiting`. These test the status of a single application or unit, whereas the `jubilant.all_*` and `jubilant.any_*` functions test the statuses of multiple applications *and* all their units.
-
-For example, to wait till `myapp` is active and `yourapp` is blocked, and to raise an error if any app or unit goes into error state:
-
-```python
-def test_custom_wait(juju: jubilant.Juju):
-    juju.deploy('myapp')
-    juju.deploy('yourapp')
-    juju.wait(
-        lambda status: (
-            status.apps['myapp'].is_active and
-            status.apps['yourapp'].is_blocked
-        ),
-        error=jubilant.any_error,
-    )
-```
-
-
-## Fall back to `Juju.cli` if needed
-
-Many common Juju commands are already defined on the `Juju` class, such as [`deploy`](jubilant.Juju.deploy) and [`integrate`](jubilant.Juju.deploy).
-
-However, if you want to run a Juju command that's not yet defined in Jubilant, you can fall back to calling the [`Juju.cli`](jubilant.Juju.cli) method. For example, to fetch a model configuration value using `juju model-config`:
-
-```python
->>> import json
->>> import jubilant
->>> juju = jubilant.Juju(model='test')
->>> stdout = juju.cli('model-config', '--format=json')
->>> result = json.loads(stdout)
->>> result['automatically-retry-hooks']['Value']
-True
-```
-
-By default, `Juju.cli` adds a `--model=<model>` parameter if the `Juju` instance has a model set. To prevent this for commands not specific to a model, specify `include_model=False`:
-
-```python
->>> stdout = juju.cli('controllers', '--format=json', include_model=False)
->>> result = json.loads(stdout)
->>> result['controllers']['k8s']['uuid']
-'cda7763e-05fc-4e55-80ab-7b39badaa50d'
-```
-
-
-## Use `concierge` in CI
-
-We recommend using [concierge](https://github.com/jnsgruk/concierge/) to set up Juju when running your integration tests in CI. It will install Juju with a provider like MicroK8s and bootstrap a controller for you. For example, using GitHub Actions:
-
-```
-- name: Install concierge
-  run: sudo snap install --classic concierge
-
-- name: Install Juju and bootstrap
-  run: |
-      sudo concierge prepare \
-          --juju-channel=3/stable \
-          --charmcraft-channel=3.x/stable \
-          --preset microk8s
-
-- name: Run integration tests
-  run: |
-      charmcraft pack
-      uv run pytest tests/integration -vv --log-level=INFO
-```
-
-
 (next_steps)=
 ## Next steps
 
-You've now learned the basics of Jubilant! To learn more:
+You've now learned the basics of Jubilant-backports! To learn more:
 
-- Look over the [`jubilant` API reference](/reference/jubilant)
-- See [Jubilant's own integration tests](https://github.com/canonical/jubilant/tree/main/tests/integration) for more examples of using `Juju` methods
-- See [Jubilant's `conftest.py`](https://github.com/canonical/jubilant/blob/main/tests/integration/conftest.py) with a `juju` fixture that has a `--keep-models` command-line argument, and prints the `juju debug-log` on test failure
+- Look over the [`jubilant_backports` API reference](/reference/jubilant_backports)
+- See [Jubilant-backports's own integration tests](https://github.com/tonyandrewmeyer/jubilant-backports/tree/main/tests/integration) for more examples of using `Juju` methods
+- See [Jubilant-backports's `conftest.py`](https://github.com/tonyandrewmeyer/jubilant-backports/blob/main/tests/integration/conftest.py) with a `juju` fixture that has a `--keep-models` command-line argument, and prints the `juju debug-log` on test failure
 
-If you have any problems or want to request new features, please [open an issue](https://github.com/canonical/jubilant/issues/new).
+If you have any problems or want to request new features, please [open an issue](https://github.com/tonyandrewmeyer/jubilant-backports/issues/new).

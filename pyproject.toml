@@ -22,10 +22,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/canonical/jubilant-backports"
-Repository = "https://github.com/canonical/jubilant-backports"
-Issues = "https://github.com/canonical/jubilant-backports/issues"
-Documentation = "https://canonical-jubilant-backports.readthedocs-hosted.com/"
+Homepage = "https://github.com/tonyandrewmeyer/jubilant-backports"
+Repository = "https://github.com/tonyandrewmeyer/jubilant-backports"
+Issues = "https://github.com/tonyandrewmeyer/jubilant-backports/issues"
+#Documentation = "https://canonical-jubilant-backports.readthedocs-hosted.com/"
 
 [dependency-groups]
 dev = [
@@ -133,4 +133,7 @@ reportPrivateUsage = false  # silence errors about use of _from_dict outside cla
 [tool.pytest.ini_options]
 pythonpath = [
   "."
+]
+markers = [
+    "machine",
 ]

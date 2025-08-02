@@ -4,20 +4,20 @@ import contextlib
 
 import pytest
 
-import jubilant_backports as jubilant
+from jubilant_backports._juju import Juju29
 
 from . import helpers
 
 
 @pytest.fixture(scope='module', autouse=True)
-def setup(juju: jubilant.Juju):
-    juju.deploy(helpers.find_charm('testdb'))
+def setup(juju: Juju29):
+    juju.deploy(helpers.find_charm('testdb'), base='ubuntu@22.04')
     juju.wait(
         lambda status: status.apps['testdb'].units['testdb/0'].workload_status.current == 'unknown'
     )
 
 
-def test_config(juju: jubilant.Juju):
+def test_config(juju: Juju29):
     config = juju.config('testdb')
     assert config['testoption'] == ''
 
@@ -31,7 +31,7 @@ def test_config(juju: jubilant.Juju):
 
 
 @contextlib.contextmanager
-def fast_forward(juju: jubilant.Juju):
+def fast_forward(juju: Juju29):
     """Context manager that temporarily speeds up update-status hooks."""
     juju.model_config({'update-status-hook-interval': '10s'})
     try:
@@ -40,14 +40,14 @@ def fast_forward(juju: jubilant.Juju):
         juju.model_config(reset=['update-status-hook-interval'])
 
 
-def test_model_config(juju: jubilant.Juju):
+def test_model_config(juju: Juju29):
     assert juju.model_config()['update-status-hook-interval'] == '5m'
     with fast_forward(juju):
         assert juju.model_config()['update-status-hook-interval'] == '10s'
     assert juju.model_config()['update-status-hook-interval'] == '5m'
 
 
-def test_trust(juju: jubilant.Juju):
+def test_trust(juju: Juju29):
     app_config = juju.config('testdb', app_config=True)
     assert app_config['trust'] is False
 

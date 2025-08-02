@@ -1,5 +1,4 @@
 import datetime
-import ast
 import pathlib
 import sys
 
@@ -28,7 +27,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))  # So that sphinx.
 #
 # TODO: [@dwilding DONE] Update with the official name of your project or product
 
-project = "Jubilant"
+project = "Jubilant-backports"
 author = "Canonical Ltd."
 
 
@@ -74,7 +73,7 @@ copyright = "%s, %s" % (datetime.date.today().year, author)
 # NOTE: The Open Graph Protocol (OGP) enhances page display in a social graph
 #       and is used by social media platforms; see https://ogp.me/
 
-ogp_site_url = "https://canonical-jubilant.readthedocs-hosted.com/"
+ogp_site_url = "https://canonical-jubilant-backports.readthedocs-hosted.com/"
 
 
 # Preview name of the documentation website
@@ -110,7 +109,7 @@ html_context = {
     # TODO: If there's no such website,
     #       remove the {{ product_page }} link from the page header template
     #       (usually .sphinx/_templates/header.html; also, see README.rst).
-    "product_page": "github.com/canonical/jubilant",
+    "product_page": "github.com/canonical/jubilant-backports",
     # Product tag image; the orange part of your logo, shown in the page header
     #
     # TODO: [@dwilding DONE] To add a tag image, uncomment and update as needed.
@@ -136,7 +135,7 @@ html_context = {
     #
     # NOTE: If set, links for viewing the documentation source files
     #       and creating GitHub issues are added at the bottom of each page.
-    "github_url": "https://github.com/canonical/jubilant",
+    "github_url": "https://github.com/canonical/jubilant-backports",
     # Docs branch in the repo; used in links for viewing the source files
     #
     # TODO: To customise the branch, uncomment and update as needed.
@@ -160,7 +159,7 @@ html_context = {
 # To enable the edit button (pencil icon next to the feedback button)
 #
 # html_theme_options = {
-# 'source_edit_link': 'https://github.com/canonical/jubilant',
+# 'source_edit_link': 'https://github.com/canonical/jubilant-backports',
 # }
 
 # Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
