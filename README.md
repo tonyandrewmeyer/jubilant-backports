@@ -1,4 +1,4 @@
-** jubilant-backports is now maintained in a branch in the Jubilant repository. **
+**jubilant-backports is now maintained in a branch in the Jubilant repository.**
 
 # Jubilant-backports, the joyful library for integration-testing charms in Juju 2.9 and above
 
